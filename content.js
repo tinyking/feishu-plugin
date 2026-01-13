@@ -1,7 +1,7 @@
 /**
- * 飞书转公众号插件 - V15.1 (修复版)
- * 1. 修复：增加对 chrome.storage 的安全检查，防止权限缺失导致崩溃
- * 2. 优化：默认样式调整，增加容错机制
+ * 飞书转公众号插件 - V15.2 (去除目录干扰版)
+ * 1. 修复：精准过滤飞书文档中的“目录 (TOC)”模块，防止标题重复出现
+ * 2. 保持：配置管理、预览抽屉、语义化列表等所有高级功能
  */
 
 // ==========================================
@@ -9,7 +9,7 @@
 // ==========================================
 
 const DEFAULT_CONFIG = {
-    themeColor: '#00d6b9', // 默认青色
+    themeColor: '#00d6b9',
     fontSize: '16px',
     lineHeight: '1.8',
     textAlign: 'justify'
@@ -29,7 +29,6 @@ const THEME_PRESETS = [
 // ==========================================
 
 function getWxStyles(config) {
-    // 确保 config 不为空
     const c = { ...DEFAULT_CONFIG, ...(config || {}) };
     
     return {
@@ -117,15 +116,13 @@ const DRAWER_STYLES = `
 `;
 
 // ==========================================
-// 4. 全局状态管理 (增强容错)
+// 4. 全局状态管理
 // ==========================================
 let GLOBAL_BLOCKS = [];
 let CURRENT_CONFIG = { ...DEFAULT_CONFIG };
 
-// 安全的加载配置
 async function loadConfig() {
     return new Promise((resolve) => {
-        // 关键修复：检查 chrome.storage 是否存在
         if (chrome && chrome.storage && chrome.storage.sync) {
             chrome.storage.sync.get(['feishu_wx_config'], (result) => {
                 if (result && result.feishu_wx_config) {
@@ -134,13 +131,11 @@ async function loadConfig() {
                 resolve(CURRENT_CONFIG);
             });
         } else {
-            console.warn("[FeishuPro] 无法读取 Storage 权限，使用默认配置。请检查 manifest.json");
             resolve(DEFAULT_CONFIG);
         }
     });
 }
 
-// 安全的保存配置
 function saveConfig() {
     if (chrome && chrome.storage && chrome.storage.sync) {
         chrome.storage.sync.set({ 'feishu_wx_config': CURRENT_CONFIG });
@@ -156,7 +151,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         await loadConfig();
         
-        console.log("[FeishuPro V15.1] 开始采集...");
+        console.log("[FeishuPro V15.2] 开始采集...");
         const blockData = await scrollAndCollect();
         if (!blockData || blockData.length === 0) throw new Error("未提取到内容，请确保页面加载完全");
         
@@ -283,7 +278,7 @@ function showPreviewDrawer(initialHtml) {
 }
 
 // ==========================================
-// 7. 采集与渲染内核 (稳定版)
+// 7. 采集与渲染内核 (添加目录过滤)
 // ==========================================
 
 const CONTENT_POOL = new Map();
@@ -354,21 +349,33 @@ function isGarbageContent(text) {
 
 function extractWikiBlocks(nodes) {
     nodes.forEach((node, index) => {
+        // 过滤表格内、嵌套引用
         if (node.closest('.block[class*="docx-table"]') && !node.className.includes('table')) return;
         if (node.closest('.block[class*="docx-quote"]') && node !== node.closest('.block[class*="docx-quote"]')) return;
+        
+        // 关键修复：过滤目录块 (Table of Contents)
+        // 飞书目录块通常有 'docx-toc-block' 或者 class 中包含 'toc'
+        if (node.className.includes('toc') || node.closest('.docx-toc-block')) return;
+
         const id = node.getAttribute('data-block-id') || `wiki_${index}`;
         if (CONTENT_POOL.has(id)) return;
+        
         const typeInfo = identifyType(node);
         if (!typeInfo) return;
+        
         const textContent = extractFormattedText(node.querySelector('.text-editor') || node);
         if (isGarbageContent(textContent)) return;
         if (!textContent && typeInfo.type !== 'image' && typeInfo.type !== 'divider') return;
+        
         CONTENT_POOL.set(id, { id, type: typeInfo.type, level: typeInfo.level, content: textContent, src: typeInfo.src });
     });
 }
 
 function extractAceLines(nodes) {
     nodes.forEach((node, index) => {
+        // Ace 模式下过滤目录比较难，通常根据 class
+        if (node.classList.contains('toc-block')) return;
+
         const id = `ace_${index}`;
         if (CONTENT_POOL.has(id)) return;
         let type = 'p', level = 0, src = null;
@@ -377,6 +384,7 @@ function extractAceLines(nodes) {
         else if (cls.includes('list-')) { type = cls.includes('ordered') ? 'ol' : 'ul'; }
         else if (cls.includes('quote')) { type = 'quote'; }
         else if (cls.includes('gallery')) { type = 'image'; const img = node.querySelector('img'); if (img) src = img.src; }
+        
         const textContent = extractFormattedText(node);
         if (isGarbageContent(textContent)) return;
         if (!textContent && !src) return;
