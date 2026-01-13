@@ -1,0 +1,255 @@
+/* 弹窗基础样式 */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.popup-container {
+    width: 600px;
+    max-height: 800px;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 弹窗头部 */
+.popup-header {
+    background-color: #0078d4;
+    color: white;
+    padding: 15px;
+    text-align: center;
+}
+
+.popup-header h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* 弹窗主体 */
+.popup-main {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+/* 控件区域 */
+.controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #0078d4;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #106ebe;
+}
+
+.btn-success {
+    background-color: #5cb85c;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #4cae4c;
+}
+
+/* 状态栏 */
+.status-bar {
+    background-color: #f0f0f0;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+/* 预览容器 */
+.preview-container {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 20px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* 预览标题 */
+.preview-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    text-align: center;
+}
+
+/* 预览内容 - 模拟微信公众号排版 */
+.preview-content {
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-size: 16px;
+    line-height: 1.8;
+    color: #333;
+}
+
+/* 标题样式 */
+.preview-content h1 {
+    font-size: 28px;
+    font-weight: bold;
+    margin: 24px 0 16px 0;
+    color: #333;
+}
+
+.preview-content h2 {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 20px 0 14px 0;
+    color: #333;
+}
+
+.preview-content h3 {
+    font-size: 20px;
+    font-weight: bold;
+    margin: 18px 0 12px 0;
+    color: #333;
+}
+
+/* 段落样式 */
+.preview-content p {
+    margin: 16px 0;
+    text-indent: 0;
+}
+
+/* 加粗样式 */
+.preview-content strong, .preview-content b {
+    font-weight: bold;
+    color: #333;
+}
+
+/* 斜体样式 */
+.preview-content em, .preview-content i {
+    font-style: italic;
+    color: #666;
+}
+
+/* 下划线样式 */
+.preview-content u {
+    text-decoration: underline;
+}
+
+/* 删除线样式 */
+.preview-content s, .preview-content del {
+    text-decoration: line-through;
+    color: #999;
+}
+
+/* 图片样式 */
+.preview-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 20px auto;
+    border-radius: 4px;
+}
+
+/* 列表样式 */
+.preview-content ul, .preview-content ol {
+    margin: 16px 0;
+    padding-left: 28px;
+}
+
+.preview-content li {
+    margin: 8px 0;
+    line-height: 1.8;
+}
+
+/* 表格样式 */
+.preview-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+}
+
+.preview-content th, .preview-content td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.preview-content th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+/* 弹窗底部 */
+.popup-footer {
+    padding: 10px 15px;
+    text-align: center;
+    font-size: 12px;
+    color: #666;
+    background-color: #f0f0f0;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* 响应式设计 */
+@media (max-width: 600px) {
+    .popup-container {
+        width: 100%;
+        max-height: 100vh;
+    }
+    
+    .preview-container {
+        padding: 15px;
+    }
+    
+    .preview-title {
+        font-size: 20px;
+    }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}

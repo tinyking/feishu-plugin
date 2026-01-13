@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞书文档转微信公众号插件 - 测试模拟</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .code-block {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .mock-feishu {
+            background-color: #f9f9f9;
+            border: 2px solid #0078d4;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .mock-feishu .docs-title-input {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .mock-feishu .docs-editor-container {
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            border-radius: 4px;
+        }
+        .mock-feishu [data-block-id] {
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>飞书文档转微信公众号插件 - 测试模拟</h1>
+    
+    <div class="test-section">
+        <h2>插件功能说明</h2>
+        <p>该插件用于解决从飞书文档复制内容到微信公众号编辑器时格式错乱的问题。</p>
+        <h3>核心功能：</h3>
+        <ul>
+            <li>从飞书文档提取内容</li>
+            <li>重新渲染为微信公众号兼容格式</li>
+            <li>一键复制到剪贴板</li>
+            <li>所见即所得的预览效果</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>使用流程</h2>
+        <ol>
+            <li>在Edge浏览器中打开飞书文档</li>
+            <li>点击浏览器右上角的插件图标</li>
+            <li>在弹窗中点击"提取文档内容"按钮</li>
+            <li>查看预览效果，确认格式正确</li>
+            <li>点击"复制到剪贴板"按钮</li>
+            <li>在微信公众号编辑器中粘贴内容</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>模拟飞书文档结构</h2>
+        <div class="mock-feishu">
+            <input type="text" class="docs-title-input" value="测试文档标题">
+            <div class="docs-editor-container">
+                <div data-block-id="1" class="docx-paragraph">
+                    <h1>这是一级标题</h1>
+                </div>
+                <div data-block-id="2" class="docx-paragraph">
+                    <p>这是一段普通文本，包含<strong>加粗</strong>、<em>斜体</em>和<u>下划线</u>格式。</p>
+                </div>
+                <div data-block-id="3" class="docx-paragraph">
+                    <img src="https://example.com/image.jpg" alt="测试图片" width="600">
+                </div>
+                <div data-block-id="4" class="docx-paragraph">
+                    <h2>这是二级标题</h2>
+                </div>
+                <div data-block-id="5" class="docx-paragraph">
+                    <ul>
+                        <li>无序列表项1</li>
+                        <li>无序列表项2</li>
+                        <li>无序列表项3</li>
+                    </ul>
+                </div>
+                <div data-block-id="6" class="docx-paragraph">
+                    <ol>
+                        <li>有序列表项1</li>
+                        <li>有序列表项2</li>
+                        <li>有序列表项3</li>
+                    </ol>
+                </div>
+                <div data-block-id="7" class="docx-paragraph">
+                    <table>
+                        <tr>
+                            <th>表头1</th>
+                            <th>表头2</th>
+                        </tr>
+                        <tr>
+                            <td>数据1</td>
+                            <td>数据2</td>
+                        </tr>
+                        <tr>
+                            <td>数据3</td>
+                            <td>数据4</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>预期渲染效果</h2>
+        <div class="preview-content" style="font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 16px; line-height: 1.8; color: #333;">
+            <h1 style="font-size: 28px; font-weight: bold; margin: 24px 0 16px 0; color: #333;">这是一级标题</h1>
+            <p style="margin: 16px 0;">这是一段普通文本，包含<strong style="font-weight: bold; color: #333;">加粗</strong>、<em style="font-style: italic; color: #666;">斜体</em>和<u style="text-decoration: underline;">下划线</u>格式。</p>
+            <img src="https://example.com/image.jpg" alt="测试图片" style="max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 4px;">
+            <h2 style="font-size: 24px; font-weight: bold; margin: 20px 0 14px 0; color: #333;">这是二级标题</h2>
+            <ul style="margin: 16px 0; padding-left: 28px;">
+                <li style="margin: 8px 0; line-height: 1.8;">无序列表项1</li>
+                <li style="margin: 8px 0; line-height: 1.8;">无序列表项2</li>
+                <li style="margin: 8px 0; line-height: 1.8;">无序列表项3</li>
+            </ul>
+            <ol style="margin: 16px 0; padding-left: 28px;">
+                <li style="margin: 8px 0; line-height: 1.8;">有序列表项1</li>
+                <li style="margin: 8px 0; line-height: 1.8;">有序列表项2</li>
+                <li style="margin: 8px 0; line-height: 1.8;">有序列表项3</li>
+            </ol>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+                <tr>
+                    <th style="border: 1px solid #e0e0e0; padding: 8px 12px; text-align: left; background-color: #f5f5f5; font-weight: bold;">表头1</th>
+                    <th style="border: 1px solid #e0e0e0; padding: 8px 12px; text-align: left; background-color: #f5f5f5; font-weight: bold;">表头2</th>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #e0e0e0; padding: 8px 12px; text-align: left;">数据1</td>
+                    <td style="border: 1px solid #e0e0e0; padding: 8px 12px; text-align: left;">数据2</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #e0e0e0; padding: 8px 12px; text-align: left;">数据3</td>
+                    <td style="border: 1px solid #e0e0e0; padding: 8px 12px; text-align: left;">数据4</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>插件安装说明</h2>
+        <ol>
+            <li>打开Edge浏览器</li>
+            <li>点击右上角的"拼图"图标</li>
+            <li>选择"管理扩展"</li>
+            <li>开启"开发者模式"</li>
+            <li>点击"加载解压缩的扩展"</li>
+            <li>选择插件文件夹</li>
+            <li>插件安装完成，可在浏览器右上角看到插件图标</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>注意事项</h2>
+        <ul>
+            <li>确保在飞书文档页面使用插件</li>
+            <li>如果提取失败，刷新页面后重试</li>
+            <li>部分复杂格式可能需要手动调整</li>
+            <li>图片需要确保URL可访问</li>
+        </ul>
+    </div>
+</body>
+</html>

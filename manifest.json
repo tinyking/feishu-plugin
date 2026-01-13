@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "飞书文档转微信公众号",
+  "version": "1.0.0",
+  "description": "将飞书文档内容重新渲染并复制到微信公众号，保持格式一致",
+  "author": "Your Name",
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.feishu.cn/*", "*://*.larksuite.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

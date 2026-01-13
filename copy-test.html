@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>复制功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .test-content {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .paste-area {
+            width: 100%;
+            min-height: 200px;
+            padding: 15px;
+            border: 2px dashed #0078d4;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background-color: #106ebe;
+        }
+    </style>
+</head>
+<body>
+    <h1>复制功能测试</h1>
+    
+    <div class="test-section">
+        <h2>测试说明</h2>
+        <p>此页面用于测试飞书文档转微信公众号插件的复制功能。插件会将飞书文档内容重新渲染为HTML格式，然后复制到剪贴板。</p>
+        <p>你可以使用以下步骤测试复制功能：</p>
+        <ol>
+            <li>安装并启用插件</li>
+            <li>打开飞书文档</li>
+            <li>点击插件图标，提取并复制内容</li>
+            <li>在此页面的粘贴区域粘贴内容</li>
+            <li>检查粘贴的内容是否保持了正确的HTML格式</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>模拟插件复制功能</h2>
+        <p>以下是插件生成的HTML内容示例，你可以手动复制这段HTML，然后粘贴到下方的文本域中，测试HTML格式是否能正确保留：</p>
+        <div class="test-content">
+            <pre>&lt;h1&gt;这是一级标题&lt;/h1&gt;
+&lt;p&gt;这是一段普通文本，包含&lt;strong&gt;加粗&lt;/strong&gt;、&lt;em&gt;斜体&lt;/em&gt;和&lt;u&gt;下划线&lt;/u&gt;格式。&lt;/p&gt;
+&lt;img src="https://example.com/image.jpg" alt="测试图片" style="max-width:100%;height:auto;display:block;margin:20px auto;" /&gt;
+&lt;h2&gt;这是二级标题&lt;/h2&gt;
+&lt;ul&gt;
+    &lt;li&gt;无序列表项1&lt;/li&gt;
+    &lt;li&gt;无序列表项2&lt;/li&gt;
+    &lt;li&gt;无序列表项3&lt;/li&gt;
+&lt;/ul&gt;
+&lt;ol&gt;
+    &lt;li&gt;有序列表项1&lt;/li&gt;
+    &lt;li&gt;有序列表项2&lt;/li&gt;
+    &lt;li&gt;有序列表项3&lt;/li&gt;
+&lt;/ol&gt;
+&lt;table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;"&gt;
+    &lt;tr&gt;
+        &lt;th style="background-color:#f5f5f5;font-weight:bold;border:1px solid #e0e0e0;padding:8px 12px;text-align:left;"&gt;表头1&lt;/th&gt;
+        &lt;th style="background-color:#f5f5f5;font-weight:bold;border:1px solid #e0e0e0;padding:8px 12px;text-align:left;"&gt;表头2&lt;/th&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+        &lt;td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;"&gt;数据1&lt;/td&gt;
+        &lt;td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;"&gt;数据2&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+        &lt;td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;"&gt;数据3&lt;/td&gt;
+        &lt;td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;"&gt;数据4&lt;/td&gt;
+    &lt;/tr&gt;
+&lt;/table&gt;</pre>
+        </div>
+        <button class="btn" onclick="copyTestHTML()">复制上述HTML示例</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>粘贴区域</h2>
+        <p>在此处粘贴从插件复制的内容，检查HTML格式是否正确：</p>
+        <textarea class="paste-area" placeholder="在此处粘贴内容..." id="pasteArea"></textarea>
+        <p>如果粘贴的内容显示为HTML代码（包含尖括号），说明复制功能正常工作，因为微信公众号编辑器会自动解析这些HTML标签。</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>微信公众号编辑器测试</h2>
+        <p>要测试真实的微信公众号编辑器效果，请按照以下步骤操作：</p>
+        <ol>
+            <li>登录微信公众号平台</li>
+            <li>进入"素材管理"</li>
+            <li>点击"新建图文消息"</li>
+            <li>在正文区域粘贴从插件复制的内容</li>
+            <li>检查排版效果是否与插件预览一致</li>
+        </ol>
+        <p>如果排版效果一致，说明插件的复制功能正常工作。</p>
+    </div>
+    
+    <script>
+        // 复制测试HTML内容
+        function copyTestHTML() {
+            const testHTML = `<h1>这是一级标题</h1>
+<p>这是一段普通文本，包含<strong>加粗</strong>、<em>斜体</em>和<u>下划线</u>格式。</p>
+<img src="https://example.com/image.jpg" alt="测试图片" style="max-width:100%;height:auto;display:block;margin:20px auto;" />
+<h2>这是二级标题</h2>
+<ul>
+    <li>无序列表项1</li>
+    <li>无序列表项2</li>
+    <li>无序列表项3</li>
+</ul>
+<ol>
+    <li>有序列表项1</li>
+    <li>有序列表项2</li>
+    <li>有序列表项3</li>
+</ol>
+<table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
+    <tr>
+        <th style="background-color:#f5f5f5;font-weight:bold;border:1px solid #e0e0e0;padding:8px 12px;text-align:left;">表头1</th>
+        <th style="background-color:#f5f5f5;font-weight:bold;border:1px solid #e0e0e0;padding:8px 12px;text-align:left;">表头2</th>
+    </tr>
+    <tr>
+        <td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;">数据1</td>
+        <td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;">数据2</td>
+    </tr>
+    <tr>
+        <td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;">数据3</td>
+        <td style="border:1px solid #e0e0e0;padding:8px 12px;text-align:left;">数据4</td>
+    </tr>
+</table>`;
+            
+            // 创建临时元素
+            const tempElement = document.createElement('div');
+            tempElement.innerHTML = testHTML;
+            tempElement.style.position = 'fixed';
+            tempElement.style.left = '-9999px';
+            document.body.appendChild(tempElement);
+            
+            // 选中并复制
+            const range = document.createRange();
+            range.selectNode(tempElement);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            
+            try {
+                // 使用Clipboard API
+                const clipboardItem = new ClipboardItem({
+                    'text/html': new Blob([testHTML], { type: 'text/html' }),
+                    'text/plain': new Blob([tempElement.textContent], { type: 'text/plain' })
+                });
+                
+                navigator.clipboard.write([clipboardItem]).then(() => {
+                    alert('HTML内容已复制，你可以粘贴到下方的文本域或微信公众号编辑器中测试。');
+                    document.body.removeChild(tempElement);
+                }).catch(err => {
+                    // 降级方案
+                    fallbackCopy(testHTML, tempElement);
+                });
+            } catch (error) {
+                fallbackCopy(testHTML, tempElement);
+            }
+        }
+        
+        // 降级复制方案
+        function fallbackCopy(testHTML, tempElement) {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = testHTML;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                
+                textarea.select();
+                document.execCommand('copy');
+                
+                document.body.removeChild(textarea);
+                document.body.removeChild(tempElement);
+                alert('HTML内容已复制，你可以粘贴到下方的文本域或微信公众号编辑器中测试。');
+            } catch (error) {
+                document.body.removeChild(tempElement);
+                alert('复制失败，请手动复制HTML内容。');
+            }
+        }
+        
+        // 监听粘贴事件，显示粘贴的内容类型
+        document.getElementById('pasteArea').addEventListener('paste', (e) => {
+            console.log('粘贴事件触发:', e);
+            console.log('粘贴的HTML内容:', e.clipboardData.getData('text/html'));
+            console.log('粘贴的纯文本内容:', e.clipboardData.getData('text/plain'));
+        });
+    </script>
+</body>
+</html>
