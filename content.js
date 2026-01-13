@@ -1,12 +1,12 @@
 /**
- * 飞书转公众号插件 - V13 (语义化列表重构版)
- * 1. 核心升级：将模拟列表改为标准的 ul/ol > li 结构
- * 2. 算法升级：渲染时自动合并连续的列表项
- * 3. 完美继承：智能滚动、去重、垃圾过滤、图片鉴权
+ * 飞书转公众号插件 - V14 (预览抽屉版)
+ * 1. 新增：右侧弹出预览抽屉，所见即所得
+ * 2. 新增：预览界面包含“一键复制”和“关闭”按钮
+ * 3. 核心：保留 V13 的语义化列表和智能采集引擎
  */
 
 // ==========================================
-// 1. 样式配置 (语义化列表适配)
+// 1. 公众号文章样式 (WX_STYLES)
 // ==========================================
 const WX_STYLES = {
   container: "font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; font-size: 16px; line-height: 1.8; color: #333; letter-spacing: 0.05em; padding: 20px 10px;",
@@ -22,38 +22,91 @@ const WX_STYLES = {
   bold: "font-weight: bold; color: #000;",
   inlineCode: "background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #d63384; font-size: 14px;",
   
-  // --- V13 新增语义化列表样式 ---
-  // 微信公众号对 ul/ol 的默认缩进支持较好，这里只需微调
+  // 语义化列表样式
   ul: "margin: 0 0 16px 0; padding-left: 22px; list-style-type: disc;",
   ol: "margin: 0 0 16px 0; padding-left: 22px; list-style-type: decimal;",
   li: "margin-bottom: 8px; line-height: 1.8; text-align: justify;"
 };
 
 // ==========================================
-// 2. 主逻辑入口
+// 2. 预览抽屉样式 (UI_STYLES)
+// ==========================================
+const DRAWER_STYLES = `
+  #feishu-preview-mask {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 99998;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.3s;
+  }
+  #feishu-preview-drawer {
+    position: fixed; top: 0; right: 0; width: 480px; height: 100%;
+    background: #fff; z-index: 99999;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    font-family: -apple-system, sans-serif;
+  }
+  #feishu-preview-drawer.open { transform: translateX(0); }
+  
+  .drawer-header {
+    padding: 16px 20px; border-bottom: 1px solid #eee;
+    display: flex; justify-content: space-between; align-items: center;
+    background: #fcfcfc;
+  }
+  .drawer-title { font-size: 16px; font-weight: 600; color: #333; }
+  .drawer-close { cursor: pointer; padding: 4px 8px; font-size: 20px; color: #999; border:none; background:transparent;}
+  .drawer-close:hover { color: #333; }
+  
+  .drawer-content {
+    flex: 1; overflow-y: auto; padding: 20px;
+    background: #fff;
+  }
+  /* 模拟手机屏幕宽度，让预览更真实 */
+  .mobile-view {
+    max-width: 100%; 
+    margin: 0 auto;
+  }
+
+  .drawer-footer {
+    padding: 16px 20px; border-top: 1px solid #eee;
+    background: #fff; text-align: center;
+  }
+  .btn-copy {
+    background: #00d6b9; color: #fff; border: none;
+    padding: 10px 24px; border-radius: 6px;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 214, 185, 0.3);
+    transition: background 0.2s;
+  }
+  .btn-copy:hover { background: #00b59c; }
+  .btn-copy:active { transform: translateY(1px); }
+  
+  /* 滚动条美化 */
+  .drawer-content::-webkit-scrollbar { width: 6px; }
+  .drawer-content::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+`;
+
+// ==========================================
+// 3. 主逻辑入口
 // ==========================================
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "convert_and_copy") {
     (async () => {
       try {
-        console.log("[FeishuPro V13] 启动语义化渲染引擎...");
+        console.log("[FeishuPro V14] 开始采集...");
         
         const blockData = await scrollAndCollect();
-        
-        if (!blockData || blockData.length === 0) {
-          throw new Error("未提取到内容，请确保页面已完全加载");
-        }
+        if (!blockData || blockData.length === 0) throw new Error("未提取到内容");
 
         const processedBlocks = await processImages(blockData);
-        
-        // 渲染 HTML (使用新的合并算法)
         const html = renderToHtml(processedBlocks);
 
-        copyToClipboard(html);
+        // --- 变更点：不再直接复制，而是打开预览 ---
+        showPreviewDrawer(html);
+        
         sendResponse({ success: true, count: processedBlocks.length });
-
       } catch (e) {
-        console.error("[FeishuPro Error]", e);
+        console.error(e);
         sendResponse({ success: false, msg: e.message });
       }
     })();
@@ -62,14 +115,88 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ==========================================
-// 3. 智能滚动采集引擎 (保持不变)
+// 4. UI 渲染：预览抽屉 (New Feature)
+// ==========================================
+
+function showPreviewDrawer(htmlContent) {
+    // 1. 注入 CSS
+    if (!document.getElementById('feishu-drawer-style')) {
+        const style = document.createElement('style');
+        style.id = 'feishu-drawer-style';
+        style.textContent = DRAWER_STYLES;
+        document.head.appendChild(style);
+    }
+
+    // 2. 移除旧 DOM (防止重复)
+    const oldDrawer = document.getElementById('feishu-preview-drawer');
+    const oldMask = document.getElementById('feishu-preview-mask');
+    if (oldDrawer) oldDrawer.remove();
+    if (oldMask) oldMask.remove();
+
+    // 3. 创建 DOM 结构
+    const mask = document.createElement('div');
+    mask.id = 'feishu-preview-mask';
+    
+    const drawer = document.createElement('div');
+    drawer.id = 'feishu-preview-drawer';
+    drawer.innerHTML = `
+        <div class="drawer-header">
+            <span class="drawer-title">效果预览 (公众号格式)</span>
+            <button class="drawer-close">×</button>
+        </div>
+        <div class="drawer-content">
+            <div class="mobile-view">
+                ${htmlContent}
+            </div>
+        </div>
+        <div class="drawer-footer">
+            <button class="btn-copy">复制到公众号编辑器</button>
+        </div>
+    `;
+
+    // 4. 插入页面
+    document.body.appendChild(mask);
+    document.body.appendChild(drawer);
+
+    // 5. 动画入场
+    requestAnimationFrame(() => {
+        drawer.classList.add('open');
+    });
+
+    // 6. 绑定事件
+    const closeBtn = drawer.querySelector('.drawer-close');
+    const copyBtn = drawer.querySelector('.btn-copy');
+
+    const closeHandler = () => {
+        drawer.classList.remove('open');
+        mask.style.opacity = '0';
+        setTimeout(() => {
+            if (drawer.parentNode) drawer.remove();
+            if (mask.parentNode) mask.remove();
+        }, 300);
+    };
+
+    const copyHandler = () => {
+        copyToClipboard(htmlContent);
+        copyBtn.textContent = "已复制！快去粘贴吧";
+        copyBtn.style.background = "#67c23a";
+        setTimeout(() => {
+            closeHandler();
+        }, 800);
+    };
+
+    closeBtn.onclick = closeHandler;
+    mask.onclick = closeHandler;
+    copyBtn.onclick = copyHandler;
+}
+
+
+// ==========================================
+// 5. 智能采集与处理 (V13 内核保持不变)
 // ==========================================
 
 const CONTENT_POOL = new Map();
-const GARBAGE_TEXTS = [
-    "本文暂未被其它文档引用", "本文被以下文档引用", "No references to this document",
-    "References to this document", "添加评论", "分享", "复制链接"
-];
+const GARBAGE_TEXTS = ["本文暂未被其它文档引用", "本文被以下文档引用", "No references", "References to", "添加评论", "分享", "复制链接"];
 
 async function scrollAndCollect() {
     CONTENT_POOL.clear();
@@ -77,10 +204,7 @@ async function scrollAndCollect() {
     if (!scrollContainer) throw new Error("无法找到正文滚动区域");
 
     collectVisibleBlocks();
-
-    if (scrollContainer.scrollHeight <= scrollContainer.clientHeight + 100) {
-        return getSortedBlocks();
-    }
+    if (scrollContainer.scrollHeight <= scrollContainer.clientHeight + 100) return getSortedBlocks();
 
     const totalHeight = scrollContainer.scrollHeight;
     const viewportHeight = scrollContainer.clientHeight;
@@ -93,12 +217,10 @@ async function scrollAndCollect() {
         collectVisibleBlocks(); 
         currentScroll += step;
     }
-
     scrollContainer.scrollTop = totalHeight;
     await new Promise(resolve => setTimeout(resolve, 300));
     collectVisibleBlocks();
     scrollContainer.scrollTop = 0;
-
     return getSortedBlocks();
 }
 
@@ -143,17 +265,13 @@ function extractWikiBlocks(nodes) {
     nodes.forEach((node, index) => {
         if (node.closest('.block[class*="docx-table"]') && !node.className.includes('table')) return;
         if (node.closest('.block[class*="docx-quote"]') && node !== node.closest('.block[class*="docx-quote"]')) return;
-
         const id = node.getAttribute('data-block-id') || `wiki_${index}`;
         if (CONTENT_POOL.has(id)) return;
-
         const typeInfo = identifyType(node);
         if (!typeInfo) return;
-
         const textContent = extractFormattedText(node.querySelector('.text-editor') || node);
         if (isGarbageContent(textContent)) return;
         if (!textContent && typeInfo.type !== 'image' && typeInfo.type !== 'divider') return;
-
         CONTENT_POOL.set(id, { id, type: typeInfo.type, level: typeInfo.level, content: textContent, src: typeInfo.src });
     });
 }
@@ -162,48 +280,25 @@ function extractAceLines(nodes) {
     nodes.forEach((node, index) => {
         const id = `ace_${index}`;
         if (CONTENT_POOL.has(id)) return;
-
         let type = 'p', level = 0, src = null;
         const cls = node.className || "";
-        
-        if (cls.match(/heading-h(\d)/)) {
-            type = 'heading'; level = parseInt(cls.match(/heading-h(\d)/)[1]);
-        } else if (cls.includes('list-')) {
-            type = cls.includes('ordered') ? 'ol' : 'ul';
-        } else if (cls.includes('quote')) {
-            type = 'quote';
-        } else if (cls.includes('gallery')) {
-            type = 'image';
-            const img = node.querySelector('img');
-            if (img) src = img.src;
-        }
-
+        if (cls.match(/heading-h(\d)/)) { type = 'heading'; level = parseInt(cls.match(/heading-h(\d)/)[1]); }
+        else if (cls.includes('list-')) { type = cls.includes('ordered') ? 'ol' : 'ul'; }
+        else if (cls.includes('quote')) { type = 'quote'; }
+        else if (cls.includes('gallery')) { type = 'image'; const img = node.querySelector('img'); if (img) src = img.src; }
         const textContent = extractFormattedText(node);
         if (isGarbageContent(textContent)) return;
         if (!textContent && !src) return;
-
         CONTENT_POOL.set(id, { id, type, level, content: textContent, src });
     });
 }
 
-function getSortedBlocks() {
-    return Array.from(CONTENT_POOL.values());
-}
-
-// ==========================================
-// 4. 解析工具 (保持不变)
-// ==========================================
+function getSortedBlocks() { return Array.from(CONTENT_POOL.values()); }
 
 function identifyType(node) {
     const cls = node.className || "";
-    if (cls.includes('heading')) {
-        const match = cls.match(/heading(\d)/);
-        return { type: 'heading', level: match ? parseInt(match[1]) : 1 };
-    }
-    if (cls.includes('image')) {
-        const img = node.querySelector('img');
-        return img ? { type: 'image', src: img.src } : null;
-    }
+    if (cls.includes('heading')) { const match = cls.match(/heading(\d)/); return { type: 'heading', level: match ? parseInt(match[1]) : 1 }; }
+    if (cls.includes('image')) { const img = node.querySelector('img'); return img ? { type: 'image', src: img.src } : null; }
     if (cls.includes('bullet') || cls.includes('list')) return { type: 'ul' };
     if (cls.includes('ordered')) return { type: 'ol' };
     if (cls.includes('quote')) return { type: 'quote' };
@@ -225,15 +320,9 @@ function extractFormattedText(root) {
             const isBold = tag === 'b' || tag === 'strong' || (style.includes('font-weight') && (style.includes('bold') || style.includes('700')));
             const isCode = node.classList.contains('inline-code');
             const isLink = tag === 'a';
-
-            let inner = "";
-            const temp = [];
-            const originalPush = result.push;
-            result.push = (item) => temp.push(item);
+            let inner = ""; const temp = []; const originalPush = result.push; result.push = (item) => temp.push(item);
             node.childNodes.forEach(traverse);
-            result.push = originalPush;
-            inner = temp.join("");
-
+            result.push = originalPush; inner = temp.join("");
             if (!inner) return;
             if (isBold) inner = `<span style="${WX_STYLES.bold}">${inner}</span>`;
             if (isCode) inner = `<span style="${WX_STYLES.inlineCode}">${inner}</span>`;
@@ -244,10 +333,6 @@ function extractFormattedText(root) {
     root.childNodes.forEach(traverse);
     return result.join("");
 }
-
-// ==========================================
-// 5. 渲染与输出 (重构核心：合并列表)
-// ==========================================
 
 async function processImages(blocks) {
     const tasks = blocks.map(async (block) => {
@@ -273,80 +358,33 @@ async function urlToBase64(url) {
     } catch (e) { return null; }
 }
 
-/**
- * V13 核心渲染函数：支持列表合并 (Grouping)
- */
 function renderToHtml(blocks) {
     let html = `<div style="${WX_STYLES.container}">`;
-    
-    // 状态机变量
-    let currentListType = null; // 'ul' 或 'ol' 或 null
-
-    blocks.forEach((block, index) => {
+    let currentListType = null;
+    blocks.forEach((block) => {
         const isList = block.type === 'ul' || block.type === 'ol';
-        
-        // 1. 列表状态处理
         if (isList) {
-            // 如果列表类型改变了 (比如从 ul 变成 ol，或者之前没有列表)，先关闭旧的
-            if (currentListType && currentListType !== block.type) {
-                html += `</${currentListType}>`;
-                currentListType = null;
-            }
-            
-            // 如果当前没有开启列表，开启一个新的
-            if (!currentListType) {
-                currentListType = block.type;
-                const listStyle = currentListType === 'ul' ? WX_STYLES.ul : WX_STYLES.ol;
-                html += `<${currentListType} style="${listStyle}">`;
-            }
+            if (currentListType && currentListType !== block.type) { html += `</${currentListType}>`; currentListType = null; }
+            if (!currentListType) { currentListType = block.type; html += `<${currentListType} style="${WX_STYLES[currentListType]}">`; }
         } else {
-            // 如果当前块不是列表，但之前开启了列表，先关闭它
-            if (currentListType) {
-                html += `</${currentListType}>`;
-                currentListType = null;
-            }
+            if (currentListType) { html += `</${currentListType}>`; currentListType = null; }
         }
-
-        // 2. 内容清洗
         let content = block.content || "";
-        if (isList) {
-             // 移除飞书自带的 "1." 或 "•" 符号，因为 ul/ol 会自动生成
-            content = content.replace(/^(&nbsp;|\s|[0-9]+\.|[•·●])+/g, '').trim();
-        }
-
-        // 3. 渲染块
+        if (isList) content = content.replace(/^(&nbsp;|\s|[0-9]+\.|[•·●])+/g, '').trim();
         switch (block.type) {
             case 'heading':
                 const hStyle = block.level === 1 ? WX_STYLES.h1 : (block.level === 2 ? WX_STYLES.h2 : WX_STYLES.h3);
-                html += `<h${block.level} style="${hStyle}">${content}</h${block.level}>`;
-                break;
-            case 'ul':
-            case 'ol':
-                // 直接渲染 li，样式交给外部的 ul/ol 和 自身的 li style
-                html += `<li style="${WX_STYLES.li}"><section style="display:inline;">${content}</section></li>`;
-                break;
-            case 'quote':
-                html += `<blockquote style="${WX_STYLES.quote}">${content}</blockquote>`;
-                break;
-            case 'callout':
-                html += `<div style="${WX_STYLES.callout}">${content}</div>`;
-                break;
-            case 'code':
-                html += `<div style="${WX_STYLES.code}">${content}</div>`;
-                break;
-            case 'image':
-                if (block.src) html += `<img src="${block.src}" style="${WX_STYLES.image}" />`;
-                break;
-            default:
-                if (content) html += `<p style="${WX_STYLES.p}">${content}</p>`;
+                html += `<h${block.level} style="${hStyle}">${content}</h${block.level}>`; break;
+            case 'ul': case 'ol':
+                html += `<li style="${WX_STYLES.li}"><section style="display:inline;">${content}</section></li>`; break;
+            case 'quote': html += `<blockquote style="${WX_STYLES.quote}">${content}</blockquote>`; break;
+            case 'callout': html += `<div style="${WX_STYLES.callout}">${content}</div>`; break;
+            case 'code': html += `<div style="${WX_STYLES.code}">${content}</div>`; break;
+            case 'image': if (block.src) html += `<img src="${block.src}" style="${WX_STYLES.image}" />`; break;
+            default: if (content) html += `<p style="${WX_STYLES.p}">${content}</p>`;
         }
     });
-
-    // 循环结束后，如果还有未关闭的列表，关闭它
-    if (currentListType) {
-        html += `</${currentListType}>`;
-    }
-
+    if (currentListType) html += `</${currentListType}>`;
     html += `</div>`;
     return html;
 }
