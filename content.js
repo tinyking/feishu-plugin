@@ -1,46 +1,72 @@
 /**
- * 飞书转公众号插件 - V14 (预览抽屉版)
- * 1. 新增：右侧弹出预览抽屉，所见即所得
- * 2. 新增：预览界面包含“一键复制”和“关闭”按钮
- * 3. 核心：保留 V13 的语义化列表和智能采集引擎
+ * 飞书转公众号插件 - V15.1 (修复版)
+ * 1. 修复：增加对 chrome.storage 的安全检查，防止权限缺失导致崩溃
+ * 2. 优化：默认样式调整，增加容错机制
  */
 
 // ==========================================
-// 1. 公众号文章样式 (WX_STYLES)
+// 1. 默认配置与预设
 // ==========================================
-const WX_STYLES = {
-  container: "font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; font-size: 16px; line-height: 1.8; color: #333; letter-spacing: 0.05em; padding: 20px 10px;",
-  h1: "font-size: 24px; font-weight: bold; color: #000; margin: 30px 0 16px 0; text-align: center;",
-  h2: "font-size: 20px; font-weight: bold; color: #00d6b9; margin: 24px 0 14px 0; padding-bottom: 5px; border-bottom: 2px solid #00d6b9; display: inline-block;",
-  h3: "font-size: 17px; font-weight: bold; color: #333; margin: 20px 0 10px 0; padding-left: 8px; border-left: 4px solid #00d6b9;",
-  p: "margin-bottom: 16px; text-align: justify; word-break: break-all;",
-  quote: "margin: 20px 0; padding: 15px; background: #f7f7f7; border: none; border-left: 5px solid #d0d0d0; color: #666; font-size: 15px; border-radius: 4px;",
-  code: "margin: 16px 0; padding: 15px; background: #f5f5f5; color: #333; font-family: monospace; font-size: 14px; line-height: 1.5; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;",
-  callout: "margin: 20px 0; padding: 15px; background: #e8f4ff; border: 1px solid #4a90d9; border-radius: 4px; color: #333;",
-  image: "max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: block; margin: 20px auto;",
-  link: "color: #576b95; text-decoration: none; border-bottom: 1px dashed #576b95;",
-  bold: "font-weight: bold; color: #000;",
-  inlineCode: "background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #d63384; font-size: 14px;",
-  
-  // 语义化列表样式
-  ul: "margin: 0 0 16px 0; padding-left: 22px; list-style-type: disc;",
-  ol: "margin: 0 0 16px 0; padding-left: 22px; list-style-type: decimal;",
-  li: "margin-bottom: 8px; line-height: 1.8; text-align: justify;"
+
+const DEFAULT_CONFIG = {
+    themeColor: '#00d6b9', // 默认青色
+    fontSize: '16px',
+    lineHeight: '1.8',
+    textAlign: 'justify'
 };
 
+const THEME_PRESETS = [
+    { name: '青碧', color: '#00d6b9' },
+    { name: '蔚蓝', color: '#1890ff' },
+    { name: '赤红', color: '#ef4444' },
+    { name: '橘橙', color: '#f97316' },
+    { name: '紫罗', color: '#8b5cf6' },
+    { name: '墨黑', color: '#333333' }
+];
+
 // ==========================================
-// 2. 预览抽屉样式 (UI_STYLES)
+// 2. 动态样式生成引擎
+// ==========================================
+
+function getWxStyles(config) {
+    // 确保 config 不为空
+    const c = { ...DEFAULT_CONFIG, ...(config || {}) };
+    
+    return {
+        container: `font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; font-size: ${c.fontSize}; line-height: ${c.lineHeight}; color: #333; letter-spacing: 0.05em; padding: 20px 10px; text-align: ${c.textAlign};`,
+        h1: `font-size: 24px; font-weight: bold; color: #000; margin: 30px 0 16px 0; text-align: center;`,
+        h2: `font-size: 20px; font-weight: bold; color: ${c.themeColor}; margin: 24px 0 14px 0; padding-bottom: 5px; border-bottom: 2px solid ${c.themeColor}; display: inline-block;`,
+        h3: `font-size: 17px; font-weight: bold; color: #333; margin: 20px 0 10px 0; padding-left: 8px; border-left: 4px solid ${c.themeColor};`,
+        p: `margin-bottom: 16px; text-align: ${c.textAlign}; word-break: break-all;`,
+        quote: `margin: 20px 0; padding: 15px; background: #f7f7f7; border: none; border-left: 5px solid #d0d0d0; color: #666; font-size: 15px; border-radius: 4px;`,
+        code: `margin: 16px 0; padding: 15px; background: #f5f5f5; color: #333; font-family: monospace; font-size: 14px; line-height: 1.5; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; text-align: left;`,
+        callout: `margin: 20px 0; padding: 15px; background: #f0f9ff; border: 1px solid ${c.themeColor}; border-radius: 4px; color: #333;`,
+        image: `max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: block; margin: 20px auto;`,
+        link: `color: ${c.themeColor}; text-decoration: none; border-bottom: 1px dashed ${c.themeColor};`,
+        bold: `font-weight: bold; color: #000;`,
+        inlineCode: `background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #d63384; font-size: 14px;`,
+        
+        // 列表样式
+        ulItem: `margin-bottom: 10px; display: flex; align-items: flex-start; text-align: justify;`,
+        ulBullet: `display: inline-block; width: 6px; height: 6px; background: ${c.themeColor}; border-radius: 50%; margin-right: 10px; flex-shrink: 0; margin-top: ${parseFloat(c.lineHeight) * 16 / 2 - 3 + 2}px;`,
+        olItem: `margin-bottom: 10px; display: flex; align-items: flex-start; text-align: justify;`,
+        olNum: `margin-right: 8px; color: ${c.themeColor}; font-weight: bold; font-family: sans-serif; flex-shrink: 0; margin-top: 0px;`,
+        li: `margin-bottom: 8px; line-height: ${c.lineHeight}; text-align: ${c.textAlign};`
+    };
+}
+
+// ==========================================
+// 3. 抽屉样式
 // ==========================================
 const DRAWER_STYLES = `
   #feishu-preview-mask {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.5); z-index: 99998;
-    backdrop-filter: blur(2px);
-    transition: opacity 0.3s;
+    backdrop-filter: blur(2px); transition: opacity 0.3s;
   }
   #feishu-preview-drawer {
     position: fixed; top: 0; right: 0; width: 480px; height: 100%;
-    background: #fff; z-index: 99999;
+    background: #f7f7f7; z-index: 99999;
     box-shadow: -5px 0 15px rgba(0,0,0,0.1);
     display: flex; flex-direction: column;
     transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -51,26 +77,35 @@ const DRAWER_STYLES = `
   .drawer-header {
     padding: 16px 20px; border-bottom: 1px solid #eee;
     display: flex; justify-content: space-between; align-items: center;
-    background: #fcfcfc;
-  }
-  .drawer-title { font-size: 16px; font-weight: 600; color: #333; }
-  .drawer-close { cursor: pointer; padding: 4px 8px; font-size: 20px; color: #999; border:none; background:transparent;}
-  .drawer-close:hover { color: #333; }
-  
-  .drawer-content {
-    flex: 1; overflow-y: auto; padding: 20px;
     background: #fff;
   }
-  /* 模拟手机屏幕宽度，让预览更真实 */
-  .mobile-view {
-    max-width: 100%; 
-    margin: 0 auto;
+  .drawer-title { font-size: 16px; font-weight: 600; color: #333; }
+  .drawer-close { cursor: pointer; padding: 4px 8px; font-size: 24px; color: #999; border:none; background:transparent; line-height:1;}
+  .drawer-close:hover { color: #333; }
+  
+  .drawer-settings { padding: 15px 20px; background: #fff; border-bottom: 1px solid #eee; }
+  .setting-row { display: flex; align-items: center; margin-bottom: 12px; }
+  .setting-row:last-child { margin-bottom: 0; }
+  .setting-label { width: 60px; font-size: 13px; color: #666; font-weight: 500; }
+  .setting-content { flex: 1; display: flex; gap: 8px; align-items: center; }
+  
+  .color-btn {
+    width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.2s;
   }
-
-  .drawer-footer {
-    padding: 16px 20px; border-top: 1px solid #eee;
-    background: #fff; text-align: center;
+  .color-btn:hover { transform: scale(1.1); }
+  .color-btn.active { border-color: #333; transform: scale(1.1); }
+  
+  .size-btn {
+    padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px;
+    font-size: 12px; cursor: pointer; background: #fff; color: #333;
   }
+  .size-btn.active { background: #333; color: #fff; border-color: #333; }
+  
+  .drawer-content { flex: 1; overflow-y: auto; padding: 20px; background: #fff; }
+  .mobile-view { max-width: 100%; margin: 0 auto; }
+  
+  .drawer-footer { padding: 16px 20px; border-top: 1px solid #eee; background: #fff; text-align: center; }
   .btn-copy {
     background: #00d6b9; color: #fff; border: none;
     padding: 10px 24px; border-radius: 6px;
@@ -79,32 +114,61 @@ const DRAWER_STYLES = `
     transition: background 0.2s;
   }
   .btn-copy:hover { background: #00b59c; }
-  .btn-copy:active { transform: translateY(1px); }
-  
-  /* 滚动条美化 */
-  .drawer-content::-webkit-scrollbar { width: 6px; }
-  .drawer-content::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
 `;
 
 // ==========================================
-// 3. 主逻辑入口
+// 4. 全局状态管理 (增强容错)
+// ==========================================
+let GLOBAL_BLOCKS = [];
+let CURRENT_CONFIG = { ...DEFAULT_CONFIG };
+
+// 安全的加载配置
+async function loadConfig() {
+    return new Promise((resolve) => {
+        // 关键修复：检查 chrome.storage 是否存在
+        if (chrome && chrome.storage && chrome.storage.sync) {
+            chrome.storage.sync.get(['feishu_wx_config'], (result) => {
+                if (result && result.feishu_wx_config) {
+                    CURRENT_CONFIG = { ...DEFAULT_CONFIG, ...result.feishu_wx_config };
+                }
+                resolve(CURRENT_CONFIG);
+            });
+        } else {
+            console.warn("[FeishuPro] 无法读取 Storage 权限，使用默认配置。请检查 manifest.json");
+            resolve(DEFAULT_CONFIG);
+        }
+    });
+}
+
+// 安全的保存配置
+function saveConfig() {
+    if (chrome && chrome.storage && chrome.storage.sync) {
+        chrome.storage.sync.set({ 'feishu_wx_config': CURRENT_CONFIG });
+    }
+}
+
+// ==========================================
+// 5. 消息监听入口
 // ==========================================
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "convert_and_copy") {
     (async () => {
       try {
-        console.log("[FeishuPro V14] 开始采集...");
+        await loadConfig();
         
+        console.log("[FeishuPro V15.1] 开始采集...");
         const blockData = await scrollAndCollect();
-        if (!blockData || blockData.length === 0) throw new Error("未提取到内容");
-
+        if (!blockData || blockData.length === 0) throw new Error("未提取到内容，请确保页面加载完全");
+        
         const processedBlocks = await processImages(blockData);
-        const html = renderToHtml(processedBlocks);
+        GLOBAL_BLOCKS = processedBlocks;
 
-        // --- 变更点：不再直接复制，而是打开预览 ---
+        const styles = getWxStyles(CURRENT_CONFIG);
+        const html = renderToHtml(GLOBAL_BLOCKS, styles);
+
         showPreviewDrawer(html);
         
-        sendResponse({ success: true, count: processedBlocks.length });
+        sendResponse({ success: true });
       } catch (e) {
         console.error(e);
         sendResponse({ success: false, msg: e.message });
@@ -115,11 +179,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ==========================================
-// 4. UI 渲染：预览抽屉 (New Feature)
+// 6. UI 逻辑
 // ==========================================
 
-function showPreviewDrawer(htmlContent) {
-    // 1. 注入 CSS
+function showPreviewDrawer(initialHtml) {
     if (!document.getElementById('feishu-drawer-style')) {
         const style = document.createElement('style');
         style.id = 'feishu-drawer-style';
@@ -127,72 +190,100 @@ function showPreviewDrawer(htmlContent) {
         document.head.appendChild(style);
     }
 
-    // 2. 移除旧 DOM (防止重复)
     const oldDrawer = document.getElementById('feishu-preview-drawer');
     const oldMask = document.getElementById('feishu-preview-mask');
     if (oldDrawer) oldDrawer.remove();
     if (oldMask) oldMask.remove();
 
-    // 3. 创建 DOM 结构
     const mask = document.createElement('div');
     mask.id = 'feishu-preview-mask';
     
     const drawer = document.createElement('div');
     drawer.id = 'feishu-preview-drawer';
+    
+    const colorButtons = THEME_PRESETS.map(p => 
+        `<div class="color-btn ${p.color === CURRENT_CONFIG.themeColor ? 'active' : ''}" style="background:${p.color}" data-color="${p.color}" title="${p.name}"></div>`
+    ).join('');
+
+    const fontSizes = ['14px', '15px', '16px', '17px'];
+    const sizeButtons = fontSizes.map(s => 
+        `<button class="size-btn ${s === CURRENT_CONFIG.fontSize ? 'active' : ''}" data-size="${s}">${s.replace('px', '')}</button>`
+    ).join('');
+
     drawer.innerHTML = `
         <div class="drawer-header">
-            <span class="drawer-title">效果预览 (公众号格式)</span>
+            <span class="drawer-title">公众号排版预览</span>
             <button class="drawer-close">×</button>
         </div>
-        <div class="drawer-content">
-            <div class="mobile-view">
-                ${htmlContent}
+        <div class="drawer-settings">
+            <div class="setting-row">
+                <span class="setting-label">主题色</span>
+                <div class="setting-content" id="setting-color">${colorButtons}</div>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">字号</span>
+                <div class="setting-content" id="setting-size">${sizeButtons}</div>
             </div>
         </div>
+        <div class="drawer-content">
+            <div class="mobile-view" id="preview-container">${initialHtml}</div>
+        </div>
         <div class="drawer-footer">
-            <button class="btn-copy">复制到公众号编辑器</button>
+            <button class="btn-copy" id="final-copy-btn">复制到公众号编辑器</button>
         </div>
     `;
 
-    // 4. 插入页面
     document.body.appendChild(mask);
     document.body.appendChild(drawer);
-
-    // 5. 动画入场
-    requestAnimationFrame(() => {
-        drawer.classList.add('open');
-    });
-
-    // 6. 绑定事件
-    const closeBtn = drawer.querySelector('.drawer-close');
-    const copyBtn = drawer.querySelector('.btn-copy');
+    requestAnimationFrame(() => drawer.classList.add('open'));
 
     const closeHandler = () => {
         drawer.classList.remove('open');
         mask.style.opacity = '0';
-        setTimeout(() => {
-            if (drawer.parentNode) drawer.remove();
-            if (mask.parentNode) mask.remove();
-        }, 300);
+        setTimeout(() => { if (drawer.parentNode) drawer.remove(); if (mask.parentNode) mask.remove(); }, 300);
     };
-
-    const copyHandler = () => {
-        copyToClipboard(htmlContent);
-        copyBtn.textContent = "已复制！快去粘贴吧";
-        copyBtn.style.background = "#67c23a";
-        setTimeout(() => {
-            closeHandler();
-        }, 800);
-    };
-
-    closeBtn.onclick = closeHandler;
+    drawer.querySelector('.drawer-close').onclick = closeHandler;
     mask.onclick = closeHandler;
-    copyBtn.onclick = copyHandler;
+
+    const reRender = () => {
+        const styles = getWxStyles(CURRENT_CONFIG);
+        const newHtml = renderToHtml(GLOBAL_BLOCKS, styles);
+        document.getElementById('preview-container').innerHTML = newHtml;
+        saveConfig();
+    };
+
+    const colorContainer = document.getElementById('setting-color');
+    colorContainer.onclick = (e) => {
+        if (e.target.classList.contains('color-btn')) {
+            CURRENT_CONFIG.themeColor = e.target.getAttribute('data-color');
+            colorContainer.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            reRender();
+        }
+    };
+
+    const sizeContainer = document.getElementById('setting-size');
+    sizeContainer.onclick = (e) => {
+        if (e.target.classList.contains('size-btn')) {
+            CURRENT_CONFIG.fontSize = e.target.getAttribute('data-size');
+            sizeContainer.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            reRender();
+        }
+    };
+
+    const copyBtn = document.getElementById('final-copy-btn');
+    copyBtn.onclick = () => {
+        const currentHtml = document.getElementById('preview-container').innerHTML;
+        copyToClipboard(currentHtml);
+        copyBtn.textContent = "已复制！";
+        copyBtn.style.background = "#67c23a";
+        setTimeout(closeHandler, 800);
+    };
 }
 
-
 // ==========================================
-// 5. 智能采集与处理 (V13 内核保持不变)
+// 7. 采集与渲染内核 (稳定版)
 // ==========================================
 
 const CONTENT_POOL = new Map();
@@ -317,6 +408,7 @@ function extractFormattedText(root) {
         } else if (node.nodeType === Node.ELEMENT_NODE) {
             const tag = node.tagName.toLowerCase();
             const style = node.getAttribute('style') || "";
+            const s = getWxStyles(CURRENT_CONFIG);
             const isBold = tag === 'b' || tag === 'strong' || (style.includes('font-weight') && (style.includes('bold') || style.includes('700')));
             const isCode = node.classList.contains('inline-code');
             const isLink = tag === 'a';
@@ -324,9 +416,9 @@ function extractFormattedText(root) {
             node.childNodes.forEach(traverse);
             result.push = originalPush; inner = temp.join("");
             if (!inner) return;
-            if (isBold) inner = `<span style="${WX_STYLES.bold}">${inner}</span>`;
-            if (isCode) inner = `<span style="${WX_STYLES.inlineCode}">${inner}</span>`;
-            if (isLink) inner = `<a href="${node.href}" style="${WX_STYLES.link}">${inner}</a>`;
+            if (isBold) inner = `<span style="${s.bold}">${inner}</span>`;
+            if (isCode) inner = `<span style="${s.inlineCode}">${inner}</span>`;
+            if (isLink) inner = `<a href="${node.href}" style="${s.link}">${inner}</a>`;
             result.push(inner);
         }
     };
@@ -358,14 +450,19 @@ async function urlToBase64(url) {
     } catch (e) { return null; }
 }
 
-function renderToHtml(blocks) {
-    let html = `<div style="${WX_STYLES.container}">`;
+function renderToHtml(blocks, styles) {
+    if (!styles) styles = getWxStyles(CURRENT_CONFIG);
+    let html = `<div style="${styles.container}">`;
     let currentListType = null;
     blocks.forEach((block) => {
         const isList = block.type === 'ul' || block.type === 'ol';
         if (isList) {
             if (currentListType && currentListType !== block.type) { html += `</${currentListType}>`; currentListType = null; }
-            if (!currentListType) { currentListType = block.type; html += `<${currentListType} style="${WX_STYLES[currentListType]}">`; }
+            if (!currentListType) { 
+                currentListType = block.type; 
+                const listStyle = block.type === 'ul' ? styles.ul : styles.ol;
+                html += `<${currentListType} style="${listStyle}">`; 
+            }
         } else {
             if (currentListType) { html += `</${currentListType}>`; currentListType = null; }
         }
@@ -373,15 +470,15 @@ function renderToHtml(blocks) {
         if (isList) content = content.replace(/^(&nbsp;|\s|[0-9]+\.|[•·●])+/g, '').trim();
         switch (block.type) {
             case 'heading':
-                const hStyle = block.level === 1 ? WX_STYLES.h1 : (block.level === 2 ? WX_STYLES.h2 : WX_STYLES.h3);
+                const hStyle = block.level === 1 ? styles.h1 : (block.level === 2 ? styles.h2 : styles.h3);
                 html += `<h${block.level} style="${hStyle}">${content}</h${block.level}>`; break;
             case 'ul': case 'ol':
-                html += `<li style="${WX_STYLES.li}"><section style="display:inline;">${content}</section></li>`; break;
-            case 'quote': html += `<blockquote style="${WX_STYLES.quote}">${content}</blockquote>`; break;
-            case 'callout': html += `<div style="${WX_STYLES.callout}">${content}</div>`; break;
-            case 'code': html += `<div style="${WX_STYLES.code}">${content}</div>`; break;
-            case 'image': if (block.src) html += `<img src="${block.src}" style="${WX_STYLES.image}" />`; break;
-            default: if (content) html += `<p style="${WX_STYLES.p}">${content}</p>`;
+                html += `<li style="${styles.li}"><section style="display:inline;">${content}</section></li>`; break;
+            case 'quote': html += `<blockquote style="${styles.quote}">${content}</blockquote>`; break;
+            case 'callout': html += `<div style="${styles.callout}">${content}</div>`; break;
+            case 'code': html += `<div style="${styles.code}">${content}</div>`; break;
+            case 'image': if (block.src) html += `<img src="${block.src}" style="${styles.image}" />`; break;
+            default: if (content) html += `<p style="${styles.p}">${content}</p>`;
         }
     });
     if (currentListType) html += `</${currentListType}>`;

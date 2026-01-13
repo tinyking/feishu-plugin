@@ -1,24 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "飞书文档转微信公众号",
-  "version": "1.0.0",
-  "description": "将飞书文档内容重新渲染并复制到微信公众号，保持格式一致",
-  "author": "Your Name",
+  "name": "飞书转公众号助手",
+  "version": "1.5",
+  "description": "将飞书文档转换为微信公众号HTML格式",
   "permissions": [
     "activeTab",
+    "scripting",
     "clipboardWrite",
-    "scripting"
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.feishu.cn/*", "*://*.larksuite.com/*"],
+      "matches": ["*://*.feishu.cn/docx/*", "*://*.larksuite.com/docx/*", "*://*.feishu.cn/wiki/*"],
       "js": ["content.js"]
     }
-  ],
-  "background": {
-    "service_worker": "background.js"
-  }
+  ]
 }
