@@ -1,12 +1,12 @@
 /**
- * 飞书转公众号插件 - V12 (列表排版优化版)
- * 1. 修复列表内容换行问题 (将 div 换为 section)
- * 2. 优化列表对齐，圆点/数字与文字完美同行
- * 3. 保持 V11 的所有功能 (智能滚动、去重、过滤)
+ * 飞书转公众号插件 - V13 (语义化列表重构版)
+ * 1. 核心升级：将模拟列表改为标准的 ul/ol > li 结构
+ * 2. 算法升级：渲染时自动合并连续的列表项
+ * 3. 完美继承：智能滚动、去重、垃圾过滤、图片鉴权
  */
 
 // ==========================================
-// 1. 样式配置 (优化列表项)
+// 1. 样式配置 (语义化列表适配)
 // ==========================================
 const WX_STYLES = {
   container: "font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; font-size: 16px; line-height: 1.8; color: #333; letter-spacing: 0.05em; padding: 20px 10px;",
@@ -18,18 +18,15 @@ const WX_STYLES = {
   code: "margin: 16px 0; padding: 15px; background: #f5f5f5; color: #333; font-family: monospace; font-size: 14px; line-height: 1.5; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;",
   callout: "margin: 20px 0; padding: 15px; background: #e8f4ff; border: 1px solid #4a90d9; border-radius: 4px; color: #333;",
   image: "max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: block; margin: 20px auto;",
-  
-  // --- 列表样式优化 ---
-  ulItem: "margin-bottom: 10px; display: flex; align-items: flex-start;",
-  // margin-top: 11px 是为了适配 1.8倍行高，让点居中
-  ulBullet: "display: inline-block; width: 6px; height: 6px; background: #00d6b9; border-radius: 50%; margin-right: 10px; flex-shrink: 0; margin-top: 11px;",
-  
-  olItem: "margin-bottom: 10px; display: flex; align-items: flex-start;",
-  olNum: "margin-right: 8px; color: #00d6b9; font-weight: bold; font-family: sans-serif; flex-shrink: 0; margin-top: 0px;",
-  
   link: "color: #576b95; text-decoration: none; border-bottom: 1px dashed #576b95;",
   bold: "font-weight: bold; color: #000;",
-  inlineCode: "background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #d63384; font-size: 14px;"
+  inlineCode: "background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #d63384; font-size: 14px;",
+  
+  // --- V13 新增语义化列表样式 ---
+  // 微信公众号对 ul/ol 的默认缩进支持较好，这里只需微调
+  ul: "margin: 0 0 16px 0; padding-left: 22px; list-style-type: disc;",
+  ol: "margin: 0 0 16px 0; padding-left: 22px; list-style-type: decimal;",
+  li: "margin-bottom: 8px; line-height: 1.8; text-align: justify;"
 };
 
 // ==========================================
@@ -39,7 +36,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "convert_and_copy") {
     (async () => {
       try {
-        console.log("[FeishuPro V12] 启动转换引擎...");
+        console.log("[FeishuPro V13] 启动语义化渲染引擎...");
         
         const blockData = await scrollAndCollect();
         
@@ -48,6 +45,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         const processedBlocks = await processImages(blockData);
+        
+        // 渲染 HTML (使用新的合并算法)
         const html = renderToHtml(processedBlocks);
 
         copyToClipboard(html);
@@ -63,28 +62,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ==========================================
-// 3. 智能滚动采集引擎
+// 3. 智能滚动采集引擎 (保持不变)
 // ==========================================
 
 const CONTENT_POOL = new Map();
-
 const GARBAGE_TEXTS = [
-    "本文暂未被其它文档引用",
-    "本文被以下文档引用",
-    "No references to this document",
-    "References to this document",
-    "添加评论",
-    "分享",
-    "复制链接"
+    "本文暂未被其它文档引用", "本文被以下文档引用", "No references to this document",
+    "References to this document", "添加评论", "分享", "复制链接"
 ];
 
 async function scrollAndCollect() {
     CONTENT_POOL.clear();
-    
     const scrollContainer = findMainContentContainer();
     if (!scrollContainer) throw new Error("无法找到正文滚动区域");
-
-    console.log("[FeishuPro] 锁定正文容器:", scrollContainer);
 
     collectVisibleBlocks();
 
@@ -107,68 +97,41 @@ async function scrollAndCollect() {
     scrollContainer.scrollTop = totalHeight;
     await new Promise(resolve => setTimeout(resolve, 300));
     collectVisibleBlocks();
-    
     scrollContainer.scrollTop = 0;
 
     return getSortedBlocks();
 }
 
 function findMainContentContainer() {
-    const prioritySelectors = [
-        ".docx-editor-container",
-        ".render-document",
-        "#innerdocbodyWrap",
-        ".etherpad-container-wrapper"
-    ];
-
+    const prioritySelectors = [".docx-editor-container", ".render-document", "#innerdocbodyWrap", ".etherpad-container-wrapper"];
     for (const sel of prioritySelectors) {
         const el = document.querySelector(sel);
         if (el && isScrollable(el)) return el;
     }
-
     const allDivs = document.querySelectorAll("div");
-    let maxArea = 0;
-    let bestCandidate = null;
-
+    let maxArea = 0, bestCandidate = null;
     for (const div of allDivs) {
         if (!isScrollable(div)) continue;
         const cls = (div.className || "").toLowerCase();
-        
-        if (cls.includes("nav") || cls.includes("sidebar") || cls.includes("catalog") || cls.includes("tree")) {
-            continue;
-        }
-
+        if (cls.includes("nav") || cls.includes("sidebar") || cls.includes("catalog") || cls.includes("tree")) continue;
         const rect = div.getBoundingClientRect();
         if (rect.width < 400) continue;
-
         const area = rect.width * rect.height;
-        if (area > maxArea) {
-            maxArea = area;
-            bestCandidate = div;
-        }
+        if (area > maxArea) { maxArea = area; bestCandidate = div; }
     }
-
     return bestCandidate || document.documentElement;
 }
 
 function isScrollable(el) {
     const style = window.getComputedStyle(el);
-    const hasScroll = style.overflowY === 'auto' || style.overflowY === 'scroll';
-    const isBigEnough = el.scrollHeight > el.clientHeight + 50;
-    return hasScroll && isBigEnough;
+    return (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 50;
 }
 
 function collectVisibleBlocks() {
     const wikiBlocks = document.querySelectorAll('.block[class*="docx-"]:not(.docx-page-block)');
-    if (wikiBlocks.length > 0) {
-        extractWikiBlocks(wikiBlocks);
-        return;
-    }
-
+    if (wikiBlocks.length > 0) return extractWikiBlocks(wikiBlocks);
     const aceLines = document.querySelectorAll('.ace-line');
-    if (aceLines.length > 0) {
-        extractAceLines(aceLines);
-    }
+    if (aceLines.length > 0) extractAceLines(aceLines);
 }
 
 function isGarbageContent(text) {
@@ -188,17 +151,10 @@ function extractWikiBlocks(nodes) {
         if (!typeInfo) return;
 
         const textContent = extractFormattedText(node.querySelector('.text-editor') || node);
-        
         if (isGarbageContent(textContent)) return;
         if (!textContent && typeInfo.type !== 'image' && typeInfo.type !== 'divider') return;
 
-        CONTENT_POOL.set(id, {
-            id,
-            type: typeInfo.type,
-            level: typeInfo.level,
-            content: textContent,
-            src: typeInfo.src
-        });
+        CONTENT_POOL.set(id, { id, type: typeInfo.type, level: typeInfo.level, content: textContent, src: typeInfo.src });
     });
 }
 
@@ -207,14 +163,11 @@ function extractAceLines(nodes) {
         const id = `ace_${index}`;
         if (CONTENT_POOL.has(id)) return;
 
-        let type = 'p';
-        let level = 0;
-        let src = null;
+        let type = 'p', level = 0, src = null;
         const cls = node.className || "";
         
         if (cls.match(/heading-h(\d)/)) {
-            type = 'heading';
-            level = parseInt(cls.match(/heading-h(\d)/)[1]);
+            type = 'heading'; level = parseInt(cls.match(/heading-h(\d)/)[1]);
         } else if (cls.includes('list-')) {
             type = cls.includes('ordered') ? 'ol' : 'ul';
         } else if (cls.includes('quote')) {
@@ -238,7 +191,7 @@ function getSortedBlocks() {
 }
 
 // ==========================================
-// 4. 解析工具
+// 4. 解析工具 (保持不变)
 // ==========================================
 
 function identifyType(node) {
@@ -256,7 +209,6 @@ function identifyType(node) {
     if (cls.includes('quote')) return { type: 'quote' };
     if (cls.includes('callout')) return { type: 'callout' };
     if (cls.includes('code')) return { type: 'code' };
-    
     return { type: 'p' };
 }
 
@@ -283,11 +235,9 @@ function extractFormattedText(root) {
             inner = temp.join("");
 
             if (!inner) return;
-
             if (isBold) inner = `<span style="${WX_STYLES.bold}">${inner}</span>`;
             if (isCode) inner = `<span style="${WX_STYLES.inlineCode}">${inner}</span>`;
             if (isLink) inner = `<a href="${node.href}" style="${WX_STYLES.link}">${inner}</a>`;
-
             result.push(inner);
         }
     };
@@ -296,7 +246,7 @@ function extractFormattedText(root) {
 }
 
 // ==========================================
-// 5. 渲染与输出 (关键修复)
+// 5. 渲染与输出 (重构核心：合并列表)
 // ==========================================
 
 async function processImages(blocks) {
@@ -323,43 +273,57 @@ async function urlToBase64(url) {
     } catch (e) { return null; }
 }
 
+/**
+ * V13 核心渲染函数：支持列表合并 (Grouping)
+ */
 function renderToHtml(blocks) {
     let html = `<div style="${WX_STYLES.container}">`;
-    let olCounter = 1;
-    let lastType = null;
+    
+    // 状态机变量
+    let currentListType = null; // 'ul' 或 'ol' 或 null
 
-    blocks.forEach(block => {
-        if (block.type === 'ol') {
-            if (lastType !== 'ol') olCounter = 1;
-            block.index = olCounter++;
+    blocks.forEach((block, index) => {
+        const isList = block.type === 'ul' || block.type === 'ol';
+        
+        // 1. 列表状态处理
+        if (isList) {
+            // 如果列表类型改变了 (比如从 ul 变成 ol，或者之前没有列表)，先关闭旧的
+            if (currentListType && currentListType !== block.type) {
+                html += `</${currentListType}>`;
+                currentListType = null;
+            }
+            
+            // 如果当前没有开启列表，开启一个新的
+            if (!currentListType) {
+                currentListType = block.type;
+                const listStyle = currentListType === 'ul' ? WX_STYLES.ul : WX_STYLES.ol;
+                html += `<${currentListType} style="${listStyle}">`;
+            }
         } else {
-            olCounter = 1;
+            // 如果当前块不是列表，但之前开启了列表，先关闭它
+            if (currentListType) {
+                html += `</${currentListType}>`;
+                currentListType = null;
+            }
         }
-        lastType = block.type;
 
+        // 2. 内容清洗
         let content = block.content || "";
-        if (block.type === 'ul' || block.type === 'ol') {
+        if (isList) {
+             // 移除飞书自带的 "1." 或 "•" 符号，因为 ul/ol 会自动生成
             content = content.replace(/^(&nbsp;|\s|[0-9]+\.|[•·●])+/g, '').trim();
         }
 
+        // 3. 渲染块
         switch (block.type) {
             case 'heading':
-                const style = block.level === 1 ? WX_STYLES.h1 : (block.level === 2 ? WX_STYLES.h2 : WX_STYLES.h3);
-                html += `<h${block.level} style="${style}">${content}</h${block.level}>`;
+                const hStyle = block.level === 1 ? WX_STYLES.h1 : (block.level === 2 ? WX_STYLES.h2 : WX_STYLES.h3);
+                html += `<h${block.level} style="${hStyle}">${content}</h${block.level}>`;
                 break;
             case 'ul':
-                // 关键修复：将 inner div 改为 section，并强制 margin/padding 为 0
-                html += `<div style="${WX_STYLES.ulItem}">
-                            <span style="${WX_STYLES.ulBullet}"></span>
-                            <section style="flex:1; margin:0; padding:0; min-width:0;">${content}</section>
-                         </div>`;
-                break;
             case 'ol':
-                // 关键修复：将 inner div 改为 section
-                html += `<div style="${WX_STYLES.olItem}">
-                            <span style="${WX_STYLES.olNum}">${block.index}.</span>
-                            <section style="flex:1; margin:0; padding:0; min-width:0;">${content}</section>
-                         </div>`;
+                // 直接渲染 li，样式交给外部的 ul/ol 和 自身的 li style
+                html += `<li style="${WX_STYLES.li}"><section style="display:inline;">${content}</section></li>`;
                 break;
             case 'quote':
                 html += `<blockquote style="${WX_STYLES.quote}">${content}</blockquote>`;
@@ -377,6 +341,12 @@ function renderToHtml(blocks) {
                 if (content) html += `<p style="${WX_STYLES.p}">${content}</p>`;
         }
     });
+
+    // 循环结束后，如果还有未关闭的列表，关闭它
+    if (currentListType) {
+        html += `</${currentListType}>`;
+    }
+
     html += `</div>`;
     return html;
 }
