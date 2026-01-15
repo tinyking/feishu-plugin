@@ -1,7 +1,8 @@
 /**
- * 飞书转公众号插件 - V16 (全功能完整版)
- * 1. 新增：支持飞书文档“分割线” (Divider) 解析与渲染
- * 2. 包含：V15 的所有特性 (样式配置、目录过滤、预览抽屉、语义化列表)
+ * 飞书转公众号插件 - V16.1 (字体修复版)
+ * 1. 修复：字体大小/行高在粘贴后不生效的问题 (样式下沉策略)
+ * 2. 优化：列表圆点 (Bullet) 的位置现在会随字号自动垂直居中
+ * 3. 保持：V16 所有功能 (分割线、目录过滤、预览抽屉)
  */
 
 // ==========================================
@@ -25,35 +26,59 @@ const THEME_PRESETS = [
 ];
 
 // ==========================================
-// 2. 动态样式生成引擎
+// 2. 动态样式生成引擎 (关键修改)
 // ==========================================
 
 function getWxStyles(config) {
     const c = { ...DEFAULT_CONFIG, ...(config || {}) };
     
+    // 计算列表圆点的 margin-top，使其在不同字号下都能垂直居中
+    // 公式：(行高 * 字号 - 圆点高度6px) / 2 + 修正值
+    const numSize = parseFloat(c.fontSize);
+    const bulletMarginTop = (parseFloat(c.lineHeight) * numSize - 6) / 2;
+
     return {
+        // 容器依然保留样式，作为兜底
         container: `font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; font-size: ${c.fontSize}; line-height: ${c.lineHeight}; color: #333; letter-spacing: 0.05em; padding: 20px 10px; text-align: ${c.textAlign};`,
-        h1: `font-size: 24px; font-weight: bold; color: #000; margin: 30px 0 16px 0; text-align: center;`,
-        h2: `font-size: 20px; font-weight: bold; color: ${c.themeColor}; margin: 24px 0 14px 0; padding-bottom: 5px; border-bottom: 2px solid ${c.themeColor}; display: inline-block;`,
-        h3: `font-size: 17px; font-weight: bold; color: #333; margin: 20px 0 10px 0; padding-left: 8px; border-left: 4px solid ${c.themeColor};`,
-        p: `margin-bottom: 16px; text-align: ${c.textAlign}; word-break: break-all;`,
-        quote: `margin: 20px 0; padding: 15px; background: #f7f7f7; border: none; border-left: 5px solid #d0d0d0; color: #666; font-size: 15px; border-radius: 4px;`,
-        code: `margin: 16px 0; padding: 15px; background: #f5f5f5; color: #333; font-family: monospace; font-size: 14px; line-height: 1.5; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; text-align: left;`,
-        callout: `margin: 20px 0; padding: 15px; background: #f0f9ff; border: 1px solid ${c.themeColor}; border-radius: 4px; color: #333;`,
+        
+        h1: `font-size: 24px; font-weight: bold; color: #000; margin: 30px 0 16px 0; text-align: center; line-height: 1.4;`,
+        
+        h2: `font-size: 20px; font-weight: bold; color: ${c.themeColor}; margin: 24px 0 14px 0; padding-bottom: 5px; border-bottom: 2px solid ${c.themeColor}; display: inline-block; line-height: 1.4;`,
+        
+        h3: `font-size: 17px; font-weight: bold; color: #333; margin: 20px 0 10px 0; padding-left: 8px; border-left: 4px solid ${c.themeColor}; line-height: 1.4;`,
+        
+        // 关键修改：将 font-size 和 line-height 显式注入到 p 标签
+        p: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin-bottom: 16px; text-align: ${c.textAlign}; word-break: break-all;`,
+        
+        // 关键修改：引用块也显式注入字号
+        quote: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin: 20px 0; padding: 15px; background: #f7f7f7; border: none; border-left: 5px solid #d0d0d0; color: #666; border-radius: 4px;`,
+        
+        code: `font-size: 14px; line-height: 1.6; margin: 16px 0; padding: 15px; background: #f5f5f5; color: #333; font-family: monospace; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; text-align: left;`,
+        
+        // 关键修改：Callout 显式注入字号
+        callout: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin: 20px 0; padding: 15px; background: #f0f9ff; border: 1px solid ${c.themeColor}; border-radius: 4px; color: #333;`,
+        
         image: `max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: block; margin: 20px auto;`,
+        
         link: `color: ${c.themeColor}; text-decoration: none; border-bottom: 1px dashed ${c.themeColor};`,
+        
         bold: `font-weight: bold; color: #000;`,
+        
         inlineCode: `background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #d63384; font-size: 14px;`,
         
-        // 分割线样式 (V16 新增)
         divider: `margin: 30px 0; border: 0; border-top: 1px solid #dbdbdb;`,
 
         // 列表样式
         ulItem: `margin-bottom: 10px; display: flex; align-items: flex-start; text-align: justify;`,
-        ulBullet: `display: inline-block; width: 6px; height: 6px; background: ${c.themeColor}; border-radius: 50%; margin-right: 10px; flex-shrink: 0; margin-top: ${parseFloat(c.lineHeight) * 16 / 2 - 3 + 2}px;`,
+        
+        // 动态计算圆点位置
+        ulBullet: `display: inline-block; width: 6px; height: 6px; background: ${c.themeColor}; border-radius: 50%; margin-right: 10px; flex-shrink: 0; margin-top: ${bulletMarginTop}px;`,
+        
         olItem: `margin-bottom: 10px; display: flex; align-items: flex-start; text-align: justify;`,
         olNum: `margin-right: 8px; color: ${c.themeColor}; font-weight: bold; font-family: sans-serif; flex-shrink: 0; margin-top: 0px;`,
-        li: `margin-bottom: 8px; line-height: ${c.lineHeight}; text-align: ${c.textAlign};`
+        
+        // 关键修改：列表项 li 显式注入字号
+        li: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin-bottom: 8px; text-align: ${c.textAlign};`
     };
 }
 
@@ -154,7 +179,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         await loadConfig();
         
-        console.log("[FeishuPro V16] 开始采集...");
+        console.log("[FeishuPro V16.1] 开始采集...");
         const blockData = await scrollAndCollect();
         if (!blockData || blockData.length === 0) throw new Error("未提取到内容，请确保页面加载完全");
         
@@ -281,7 +306,7 @@ function showPreviewDrawer(initialHtml) {
 }
 
 // ==========================================
-// 7. 采集与渲染内核 (添加分割线支持)
+// 7. 采集与渲染内核
 // ==========================================
 
 const CONTENT_POOL = new Map();
@@ -365,7 +390,6 @@ function extractWikiBlocks(nodes) {
         const textContent = extractFormattedText(node.querySelector('.text-editor') || node);
         if (isGarbageContent(textContent)) return;
         
-        // V16 修改：允许分割线 (divider) 通过，即使没有文本内容
         if (!textContent && typeInfo.type !== 'image' && typeInfo.type !== 'divider') return;
         
         CONTENT_POOL.set(id, { id, type: typeInfo.type, level: typeInfo.level, content: textContent, src: typeInfo.src });
@@ -378,8 +402,6 @@ function extractAceLines(nodes) {
         const id = `ace_${index}`;
         if (CONTENT_POOL.has(id)) return;
         
-        // Ace 模式下解析分割线比较复杂，通常是 hr 标签
-        // 简化处理：如果包含 hr 则视为分割线
         let type = 'p', level = 0, src = null;
         const cls = node.className || "";
         
@@ -397,8 +419,6 @@ function extractAceLines(nodes) {
         
         const textContent = extractFormattedText(node);
         if (isGarbageContent(textContent)) return;
-        
-        // V16 修改：允许 divider 通过
         if (!textContent && !src && type !== 'divider') return;
         
         CONTENT_POOL.set(id, { id, type, level, content: textContent, src });
@@ -416,9 +436,7 @@ function identifyType(node) {
     if (cls.includes('quote')) return { type: 'quote' };
     if (cls.includes('callout')) return { type: 'callout' };
     if (cls.includes('code')) return { type: 'code' };
-    // V16 新增：识别分割线
     if (cls.includes('divider')) return { type: 'divider' };
-    
     return { type: 'p' };
 }
 
@@ -502,7 +520,6 @@ function renderToHtml(blocks, styles) {
             case 'callout': html += `<div style="${styles.callout}">${content}</div>`; break;
             case 'code': html += `<div style="${styles.code}">${content}</div>`; break;
             case 'image': if (block.src) html += `<img src="${block.src}" style="${styles.image}" />`; break;
-            // V16 新增：分割线渲染
             case 'divider': html += `<hr style="${styles.divider}" />`; break;
             default: if (content) html += `<p style="${styles.p}">${content}</p>`;
         }
