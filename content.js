@@ -1,7 +1,7 @@
 /**
- * 飞书转公众号插件 - V15.2 (去除目录干扰版)
- * 1. 修复：精准过滤飞书文档中的“目录 (TOC)”模块，防止标题重复出现
- * 2. 保持：配置管理、预览抽屉、语义化列表等所有高级功能
+ * 飞书转公众号插件 - V16 (全功能完整版)
+ * 1. 新增：支持飞书文档“分割线” (Divider) 解析与渲染
+ * 2. 包含：V15 的所有特性 (样式配置、目录过滤、预览抽屉、语义化列表)
  */
 
 // ==========================================
@@ -45,6 +45,9 @@ function getWxStyles(config) {
         bold: `font-weight: bold; color: #000;`,
         inlineCode: `background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #d63384; font-size: 14px;`,
         
+        // 分割线样式 (V16 新增)
+        divider: `margin: 30px 0; border: 0; border-top: 1px solid #dbdbdb;`,
+
         // 列表样式
         ulItem: `margin-bottom: 10px; display: flex; align-items: flex-start; text-align: justify;`,
         ulBullet: `display: inline-block; width: 6px; height: 6px; background: ${c.themeColor}; border-radius: 50%; margin-right: 10px; flex-shrink: 0; margin-top: ${parseFloat(c.lineHeight) * 16 / 2 - 3 + 2}px;`,
@@ -151,7 +154,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         await loadConfig();
         
-        console.log("[FeishuPro V15.2] 开始采集...");
+        console.log("[FeishuPro V16] 开始采集...");
         const blockData = await scrollAndCollect();
         if (!blockData || blockData.length === 0) throw new Error("未提取到内容，请确保页面加载完全");
         
@@ -174,7 +177,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ==========================================
-// 6. UI 逻辑
+// 6. UI 逻辑 (预览抽屉)
 // ==========================================
 
 function showPreviewDrawer(initialHtml) {
@@ -278,7 +281,7 @@ function showPreviewDrawer(initialHtml) {
 }
 
 // ==========================================
-// 7. 采集与渲染内核 (添加目录过滤)
+// 7. 采集与渲染内核 (添加分割线支持)
 // ==========================================
 
 const CONTENT_POOL = new Map();
@@ -349,12 +352,8 @@ function isGarbageContent(text) {
 
 function extractWikiBlocks(nodes) {
     nodes.forEach((node, index) => {
-        // 过滤表格内、嵌套引用
         if (node.closest('.block[class*="docx-table"]') && !node.className.includes('table')) return;
         if (node.closest('.block[class*="docx-quote"]') && node !== node.closest('.block[class*="docx-quote"]')) return;
-        
-        // 关键修复：过滤目录块 (Table of Contents)
-        // 飞书目录块通常有 'docx-toc-block' 或者 class 中包含 'toc'
         if (node.className.includes('toc') || node.closest('.docx-toc-block')) return;
 
         const id = node.getAttribute('data-block-id') || `wiki_${index}`;
@@ -365,6 +364,8 @@ function extractWikiBlocks(nodes) {
         
         const textContent = extractFormattedText(node.querySelector('.text-editor') || node);
         if (isGarbageContent(textContent)) return;
+        
+        // V16 修改：允许分割线 (divider) 通过，即使没有文本内容
         if (!textContent && typeInfo.type !== 'image' && typeInfo.type !== 'divider') return;
         
         CONTENT_POOL.set(id, { id, type: typeInfo.type, level: typeInfo.level, content: textContent, src: typeInfo.src });
@@ -373,21 +374,33 @@ function extractWikiBlocks(nodes) {
 
 function extractAceLines(nodes) {
     nodes.forEach((node, index) => {
-        // Ace 模式下过滤目录比较难，通常根据 class
         if (node.classList.contains('toc-block')) return;
-
         const id = `ace_${index}`;
         if (CONTENT_POOL.has(id)) return;
+        
+        // Ace 模式下解析分割线比较复杂，通常是 hr 标签
+        // 简化处理：如果包含 hr 则视为分割线
         let type = 'p', level = 0, src = null;
         const cls = node.className || "";
-        if (cls.match(/heading-h(\d)/)) { type = 'heading'; level = parseInt(cls.match(/heading-h(\d)/)[1]); }
-        else if (cls.includes('list-')) { type = cls.includes('ordered') ? 'ol' : 'ul'; }
-        else if (cls.includes('quote')) { type = 'quote'; }
-        else if (cls.includes('gallery')) { type = 'image'; const img = node.querySelector('img'); if (img) src = img.src; }
+        
+        if (node.querySelector('hr') || cls.includes('divider')) {
+            type = 'divider';
+        } else if (cls.match(/heading-h(\d)/)) { 
+            type = 'heading'; level = parseInt(cls.match(/heading-h(\d)/)[1]); 
+        } else if (cls.includes('list-')) { 
+            type = cls.includes('ordered') ? 'ol' : 'ul'; 
+        } else if (cls.includes('quote')) { 
+            type = 'quote'; 
+        } else if (cls.includes('gallery')) { 
+            type = 'image'; const img = node.querySelector('img'); if (img) src = img.src; 
+        }
         
         const textContent = extractFormattedText(node);
         if (isGarbageContent(textContent)) return;
-        if (!textContent && !src) return;
+        
+        // V16 修改：允许 divider 通过
+        if (!textContent && !src && type !== 'divider') return;
+        
         CONTENT_POOL.set(id, { id, type, level, content: textContent, src });
     });
 }
@@ -403,6 +416,9 @@ function identifyType(node) {
     if (cls.includes('quote')) return { type: 'quote' };
     if (cls.includes('callout')) return { type: 'callout' };
     if (cls.includes('code')) return { type: 'code' };
+    // V16 新增：识别分割线
+    if (cls.includes('divider')) return { type: 'divider' };
+    
     return { type: 'p' };
 }
 
@@ -486,6 +502,8 @@ function renderToHtml(blocks, styles) {
             case 'callout': html += `<div style="${styles.callout}">${content}</div>`; break;
             case 'code': html += `<div style="${styles.code}">${content}</div>`; break;
             case 'image': if (block.src) html += `<img src="${block.src}" style="${styles.image}" />`; break;
+            // V16 新增：分割线渲染
+            case 'divider': html += `<hr style="${styles.divider}" />`; break;
             default: if (content) html += `<p style="${styles.p}">${content}</p>`;
         }
     });
