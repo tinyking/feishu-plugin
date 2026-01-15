@@ -1,16 +1,19 @@
 {
   "manifest_version": 3,
   "name": "飞书转公众号助手",
-  "version": "1.5",
-  "description": "将飞书文档转换为微信公众号HTML格式",
+  "version": "1.8",
+  "description": "一键将飞书文档转换为微信公众号HTML格式",
   "permissions": [
     "activeTab",
     "scripting",
     "clipboardWrite",
     "storage"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
-    "default_popup": "popup.html"
+    "default_title": "点击转换飞书文档"
   },
   "content_scripts": [
     {
