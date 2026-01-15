@@ -1,8 +1,8 @@
 /**
- * 飞书转公众号插件 - V16.1 (字体修复版)
- * 1. 修复：字体大小/行高在粘贴后不生效的问题 (样式下沉策略)
- * 2. 优化：列表圆点 (Bullet) 的位置现在会随字号自动垂直居中
- * 3. 保持：V16 所有功能 (分割线、目录过滤、预览抽屉)
+ * 飞书转公众号插件 - V16.2 (列表防截断版)
+ * 1. 修复：有序列表 (ol) 数字被截断的问题 (增大 padding-left)
+ * 2. 优化：列表缩进参数微调，适配多位数序号
+ * 3. 保持：所有 V16.1 的功能
  */
 
 // ==========================================
@@ -32,13 +32,10 @@ const THEME_PRESETS = [
 function getWxStyles(config) {
     const c = { ...DEFAULT_CONFIG, ...(config || {}) };
     
-    // 计算列表圆点的 margin-top，使其在不同字号下都能垂直居中
-    // 公式：(行高 * 字号 - 圆点高度6px) / 2 + 修正值
+    // 计算列表圆点位置 (仅作参考，语义化列表主要靠 padding)
     const numSize = parseFloat(c.fontSize);
-    const bulletMarginTop = (parseFloat(c.lineHeight) * numSize - 6) / 2;
-
+    
     return {
-        // 容器依然保留样式，作为兜底
         container: `font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; font-size: ${c.fontSize}; line-height: ${c.lineHeight}; color: #333; letter-spacing: 0.05em; padding: 20px 10px; text-align: ${c.textAlign};`,
         
         h1: `font-size: 24px; font-weight: bold; color: #000; margin: 30px 0 16px 0; text-align: center; line-height: 1.4;`,
@@ -47,15 +44,13 @@ function getWxStyles(config) {
         
         h3: `font-size: 17px; font-weight: bold; color: #333; margin: 20px 0 10px 0; padding-left: 8px; border-left: 4px solid ${c.themeColor}; line-height: 1.4;`,
         
-        // 关键修改：将 font-size 和 line-height 显式注入到 p 标签
+        // 正文样式下沉
         p: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin-bottom: 16px; text-align: ${c.textAlign}; word-break: break-all;`,
         
-        // 关键修改：引用块也显式注入字号
         quote: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin: 20px 0; padding: 15px; background: #f7f7f7; border: none; border-left: 5px solid #d0d0d0; color: #666; border-radius: 4px;`,
         
         code: `font-size: 14px; line-height: 1.6; margin: 16px 0; padding: 15px; background: #f5f5f5; color: #333; font-family: monospace; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; text-align: left;`,
         
-        // 关键修改：Callout 显式注入字号
         callout: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin: 20px 0; padding: 15px; background: #f0f9ff; border: 1px solid ${c.themeColor}; border-radius: 4px; color: #333;`,
         
         image: `max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: block; margin: 20px auto;`,
@@ -68,16 +63,13 @@ function getWxStyles(config) {
         
         divider: `margin: 30px 0; border: 0; border-top: 1px solid #dbdbdb;`,
 
-        // 列表样式
-        ulItem: `margin-bottom: 10px; display: flex; align-items: flex-start; text-align: justify;`,
+        // --- 关键修改：增大列表 padding ---
+        // ul (无序列表): 28px 足够放下圆点
+        ul: `margin: 0 0 16px 0; padding-left: 28px; list-style-type: disc;`,
         
-        // 动态计算圆点位置
-        ulBullet: `display: inline-block; width: 6px; height: 6px; background: ${c.themeColor}; border-radius: 50%; margin-right: 10px; flex-shrink: 0; margin-top: ${bulletMarginTop}px;`,
+        // ol (有序列表): 34px 足够放下两位数 (如 10.) 甚至三位数
+        ol: `margin: 0 0 16px 0; padding-left: 34px; list-style-type: decimal;`,
         
-        olItem: `margin-bottom: 10px; display: flex; align-items: flex-start; text-align: justify;`,
-        olNum: `margin-right: 8px; color: ${c.themeColor}; font-weight: bold; font-family: sans-serif; flex-shrink: 0; margin-top: 0px;`,
-        
-        // 关键修改：列表项 li 显式注入字号
         li: `font-size: ${c.fontSize}; line-height: ${c.lineHeight}; margin-bottom: 8px; text-align: ${c.textAlign};`
     };
 }
@@ -179,7 +171,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         await loadConfig();
         
-        console.log("[FeishuPro V16.1] 开始采集...");
+        console.log("[FeishuPro V16.2] 开始采集...");
         const blockData = await scrollAndCollect();
         if (!blockData || blockData.length === 0) throw new Error("未提取到内容，请确保页面加载完全");
         
@@ -202,7 +194,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ==========================================
-// 6. UI 逻辑 (预览抽屉)
+// 6. UI 逻辑
 // ==========================================
 
 function showPreviewDrawer(initialHtml) {
@@ -502,6 +494,7 @@ function renderToHtml(blocks, styles) {
             if (currentListType && currentListType !== block.type) { html += `</${currentListType}>`; currentListType = null; }
             if (!currentListType) { 
                 currentListType = block.type; 
+                // 动态获取列表样式
                 const listStyle = block.type === 'ul' ? styles.ul : styles.ol;
                 html += `<${currentListType} style="${listStyle}">`; 
             }
@@ -515,6 +508,7 @@ function renderToHtml(blocks, styles) {
                 const hStyle = block.level === 1 ? styles.h1 : (block.level === 2 ? styles.h2 : styles.h3);
                 html += `<h${block.level} style="${hStyle}">${content}</h${block.level}>`; break;
             case 'ul': case 'ol':
+                // 关键：li 样式中已包含字号设置
                 html += `<li style="${styles.li}"><section style="display:inline;">${content}</section></li>`; break;
             case 'quote': html += `<blockquote style="${styles.quote}">${content}</blockquote>`; break;
             case 'callout': html += `<div style="${styles.callout}">${content}</div>`; break;
